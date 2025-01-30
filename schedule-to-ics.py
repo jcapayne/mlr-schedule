@@ -42,6 +42,14 @@ if __name__ == "__main__":
     session=requests.Session()
     html=session.get('https://www.majorleague.rugby/schedule/',headers=headers)
     soup=BeautifulSoup(html.text, features="html.parser")
+    
+    
+    # check for an error and hard abort if there is one
+    error=soup.find_all('div','common-section')
+    for err in error:
+        if 'Error fetching match data' in err.text:
+            raise SystemExit(err.text)
+
 
     allmatches=soup.find_all('div',class_='list')
     
