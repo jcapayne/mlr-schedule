@@ -73,6 +73,12 @@ if __name__ == "__main__":
         matchaway=matchsoup.findAll('div','team-name-result-right')[0].h3.string
         if matchlocation == "Veterans Memorial Stadium":
             matchlocation = "Fort Quincy"
+
+        if matchaway == "Anthem RC":
+            matchaway = "Anthem Rugby Carolina"
+
+        if matchhome == "Anthem RC":
+            matchhome = "Anthem Rugby Carolina"
             
         event = Event()
         event.add('summary', "%s @ %s" % (matchaway,matchhome))
@@ -90,4 +96,3 @@ if __name__ == "__main__":
         f = open("%s/%s.ics" % (my_path, team.replace(" ", "").lower()), 'wb')
         f.write(cal[team].to_ical())
         f.close()
-    
