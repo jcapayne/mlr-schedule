@@ -37,13 +37,21 @@ if __name__ == "__main__":
         cal[team] = Calendar()
         cal[team].add('prodid', '-//Ranger Picks//rangerpicks.rugby//')
         cal[team].add('version', '2.0')
-    
+
+    # staus: Live might show me live results
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36'}
+    body = {'action': 'matchCentrePublic', 'task': 'load_more_matches', 'security': '59c5fa180c','limit': 100, 'offset': 0,'status': 'Fixture','category': '', 'team': '','tag': '', 'season': '', 'tournament': ''}
+    
     session=requests.Session()
-    html=session.get('https://www.majorleague.rugby/schedule/',headers=headers)
-    soup=BeautifulSoup(html.text, features="html.parser")
-    
-    
+    response=session.post('https://stats.majorleague.rugby/wp-admin/admin-ajax.php',headers=headers, data=body)
+
+    jsonresponse=json.loads(response.text)
+    if jsonresponse['success'] != True:
+        raise(SystemExit(response))
+
+    html=jsonresponse['data']['html']
+    soup=BeautifulSoup(html, features="html.parser")
+
     # check for an error and hard abort if there is one
     error=soup.find_all('div','common-section')
     for err in error:
@@ -51,34 +59,39 @@ if __name__ == "__main__":
             raise SystemExit(err.text)
 
 
-    allmatches=soup.find_all('div',class_='list')
-    
-
+    allmatches=soup.find_all('div',class_='match-centre-fixture')
     
     for match in allmatches:
         matchsoup=BeautifulSoup(str(match), features="html.parser")
-        matchdate=matchsoup.findAll('div','match-date')[0].string
-        matchtime=matchsoup.findAll('div','match-time')[0].string
-        try:
-            matchdatetime=datetime.strptime("%s %s" % (matchdate.string, matchtime.string), '%B %d, %Y %H:%M PM EST')
-            matchdatetime =  matchdatetime + timedelta(hours=12)
-        except:
-            matchdatetime=datetime.strptime("%s %s" % (matchdate.string, matchtime.string), '%B %d, %Y %H:%M AM EST')
-            
+        matchdate=matchsoup.find('div','match-centre-fixture-date').findAll('div')[1].string
+        matchtime=matchsoup.findAll('div','match-centre-fixture-score')[0].string.strip()
+        matchtimezone=matchsoup.findAll('div','match-centre-fixture-score-sub')[0].string.strip()
+        matchdatetime=datetime.strptime("%s %s %s" % (matchdate, matchtime, matchtimezone), '%d %B %Y %H:%M %Z')
         matchenddatetime = matchdatetime + timedelta(hours=2)
+
+        matchlocation=matchsoup.findAll('div','match-venue')[0].string.strip()
         
-        matchlocation=matchsoup.findAll('div','match-details')[0].string
-        matchtickets=matchsoup.findAll('div','buy-tickets')[0].a['href']
-        matchhome=matchsoup.findAll('div','team-name-result-left')[0].h3.string
-        matchaway=matchsoup.findAll('div','team-name-result-right')[0].h3.string
+        try:
+            matchtickets=matchsoup.findAll('div','match-centre-fixture-links')[0].a['href']
+        except:
+            matchtickets="TBD"
+
+        matchhome=matchsoup.findAll('div','match-centre-fixture-team-name')[0].string.strip()
+        matchaway=matchsoup.findAll('div','match-centre-fixture-team-name')[1].string.strip()
+
         if matchlocation == "Veterans Memorial Stadium":
             matchlocation = "Fort Quincy"
 
         if matchaway == "Anthem RC":
             matchaway = "Anthem Rugby Carolina"
-
         if matchhome == "Anthem RC":
             matchhome = "Anthem Rugby Carolina"
+        
+        if matchaway == "RFCLA":
+            matchaway = "Rugby LA"
+        if matchhome == "RFCLA":
+            matchhome = "Rugby LA"
+
             
         event = Event()
         event.add('summary', "%s @ %s" % (matchaway,matchhome))
@@ -86,7 +99,7 @@ if __name__ == "__main__":
         event.add('dtstart', datetime(matchdatetime.year, matchdatetime.month, matchdatetime.day, matchdatetime.hour, matchdatetime.minute, 0, tzinfo=timezone('US/Eastern')))
         event.add('dtend', datetime(matchenddatetime.year, matchenddatetime.month, matchenddatetime.day, matchenddatetime.hour, matchenddatetime.minute, 0, tzinfo=timezone('US/Eastern')))
         event['location'] = vText(matchlocation)
-        
+
         cal['mlr'].add_component(event)
         cal[matchhome].add_component(event)
         cal[matchaway].add_component(event)

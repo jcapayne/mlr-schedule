@@ -65,8 +65,8 @@ def create_form(round,matchups):
     # Define the form metadata
     form = {
         "info": {
-            "title": f"Ranger Picks MLR Week {round}",
-            "documentTitle": f"Ranger Picks MLR Week {round}",
+            "title": f"Ranger Picks MLR 2025 Week {round}",
+            "documentTitle": f"Ranger Picks MLR 2025 Week {round}",
         }
     }
     
@@ -191,29 +191,30 @@ def create_form(round,matchups):
     
     
 def get_matches(round):
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36'}
-    session=requests.Session()
-    html=session.get('https://www.majorleague.rugby/schedule/',headers=headers)
-    soup=BeautifulSoup(html.text, features="html.parser")
+    url="https://rangerpicks.rugby/uploads/2025/mlr.ics"
+    response=requests.get(url)
     
-    # check for an error
-    error=soup.find_all('div','common-section')
-    for err in error:
-        if 'Error fetching match data' in err.text:
-            raise SystemExit(err.text)
+    cal = Calendar.from_ical(response.text)
+    
+    friday=datetime.strptime("2025-02-14 00:00", '%Y-%m-%d %H:%M').astimezone()
+    week=[]
+    week = [0 for i in range(20)]
+    
+    # 18 weeks
+    for wk in range(1,19):
+        week[wk]=friday
+        friday=friday+timedelta(7)
 
     result=list()
-    allmatches=soup.find_all('div',class_='list')
-    for match in allmatches:
-        matchsoup=BeautifulSoup(str(match), features="html.parser")
-        matchround=matchsoup.findAll('div','match-round')[0].text.split()[1]
-        matchhome=matchsoup.findAll('div','team-name-result-left')[0].h3.string
-        matchaway=matchsoup.findAll('div','team-name-result-right')[0].h3.string
-        if matchround == f"{round}":
-            result.append({ "home": matchhome, "away": matchaway})
+    for component in cal.walk():
+        if component.name == "VEVENT":
+            if (component.decoded("dtstart") >= week[round]) and (component.decoded("dtstart") < week[round]+timedelta(6)):
+                match=component.get("summary").split('@')
+                result.append({ "away": match[0].strip(), "home": match[1].strip()})
+                
     return(result)
     
 if __name__ == "__main__":
-    for round in range(1,3):
+    for round in range(3,4):
         weeklymatchups=get_matches(round)
         create_form(round,weeklymatchups)
